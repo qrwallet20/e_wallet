@@ -1,8 +1,8 @@
 import { DataTypes } from 'sequelize';
 import sequelize from '../config/database.js';
-import bcrypt from 'bcrypt';
 
-const user = sequelize.define('user', {
+
+const User = sequelize.define('User', {
     customer_id: {
         type: DataTypes.STRING(55),
         primaryKey: true,
@@ -22,7 +22,7 @@ const user = sequelize.define('user', {
     },
     pin: {
         type: DataTypes.STRING(60), 
-        allowNull: false,
+        allowNull: true,
     },
     phone_number: {
         type: DataTypes.STRING(20), 
@@ -31,7 +31,7 @@ const user = sequelize.define('user', {
     },
     email: {
         type: DataTypes.STRING(55),
-        allowNull: false,
+        allowNull: true,
         unique: true,
         validate: {
             isEmail: true,
@@ -39,7 +39,7 @@ const user = sequelize.define('user', {
     },
     gender: {
         type: DataTypes.ENUM('Male', 'Female'),
-        allowNull: false,
+        allowNull: true,
     },
     DOB: {
         type: DataTypes.DATEONLY,
@@ -51,12 +51,19 @@ const user = sequelize.define('user', {
     },
     account_number: {
         type: DataTypes.STRING(10), 
-        allowNull: false,
+        allowNull: true,
         unique: true,
     },
+    kyc_update:{
+        type: DataTypes.ENUM('Completed','Uncompleted'),
+        allowNull: false,
+        defaultValue: 'Uncompleted',
+    }
 }, {
     timestamps: true,
     tableName: 'user',
+    createdAt: 'created_at',
+    updatedAt: 'updated_at', 
 });
 
-export default user;
+export default User;
