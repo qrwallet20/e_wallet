@@ -1,5 +1,5 @@
-import randomToken from 'random-token';
+// import randomToken from 'random-token';
 
-var token = randomToken(84);
+// var token = randomToken(84);
 
-console.log(token);
+// console.log(token);

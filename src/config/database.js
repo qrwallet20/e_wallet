@@ -1,5 +1,4 @@
-import {DATABASE_URL} from './env.js'
-
+import { DATABASE_URL } from './env.js';
 import { Sequelize } from 'sequelize';
 
 const sequelize = new Sequelize(DATABASE_URL, {
@@ -7,15 +6,18 @@ const sequelize = new Sequelize(DATABASE_URL, {
     logging: false,
 });
 
-// const testConnection = async () => {
-//     try {
-//         await sequelize.authenticate();
-//         console.log('✅ Database connection successful');
-//     } catch (error) {
-//         console.error('❌ Database connection failed:', error);
-//     }
-// };
+// Function to sync database models
+const syncDatabase = async () => {
+    try {
+        await sequelize.authenticate(); // Test connection
+        console.log('✅ Database connected successfully');
 
-// testConnection();
+        await sequelize.sync({ alter: true }); // Updates schema without dropping tables
+        console.log('✅ Database synced successfully');
+    } catch (error) {
+        console.error('❌ Database connection failed:', error);
+    }
+};
 
-export default sequelize;
+// Call syncDatabase only once in your `server.js`
+export { sequelize, syncDatabase };

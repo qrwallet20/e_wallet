@@ -2,6 +2,10 @@ import bcrypt from 'bcrypt';
 import User from '../models/user.js';
 import {v4 as uuid} from 'uuid';
 import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from '../utilities/tokenUtils.js';
+import RefreshToken from '../models/refreshToken.js';
+
+
+
 
 
 
@@ -62,23 +66,63 @@ const registerUser = async (firstname, lastname, password, phone_number) => {
 
 const authenticateUser = async (phone_number, password) => {
     const current_user = await User.findOne({ where: { phone_number } });
-    console.log(phone_number + '' + password + '' + current_user.password);
+
     if (!current_user) {
         throw new Error('User does not exist');
     }
-    if (!bcrypt.compare(password, current_user.password)) {
+
+    // Fix: Use `await` for `bcrypt.compare`
+    const isPasswordValid = await bcrypt.compare(password, current_user.password);
+    if (!isPasswordValid) {
         throw new Error('Invalid phone number or password');
     }
+
+    const outputMessage = (current_user.kyc_update === 'Uncompleted') 
+    ? 'Login successful, but KYC is incomplete. You must complete KYC before making transactions.' 
+    : 'Login successful';
+
 
     const accessToken = generateAccessToken(current_user);
     const refreshToken = generateRefreshToken(current_user);
 
-    return { accessToken, refreshToken };
+    // Fix: Use `current_user.customer_id`, not `new_user.customer_id`
+    await RefreshToken.create({
+        customer_id: current_user.customer_id,
+        token: refreshToken,
+        expires_at: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000), // 15 days
+    });
+
+    return { accessToken, refreshToken, outputMessage };
 };
 
 const refreshAccessToken = async (refreshToken) => {
-    const current_user = verifyRefreshToken(refreshToken);
-    return generateAccessToken(current_user);
+     // ✅ Check if refresh token exists in the database
+     const storedToken = await RefreshToken.findOne({ where: { token: refreshToken } });
+     if (!storedToken) {
+         throw new Error('Invalid or expired refresh token');
+     }
+ 
+     // ✅ Verify refresh token
+     const decoded = verifyRefreshToken(refreshToken);
+     if (!decoded) {
+         throw new Error('Invalid or expired refresh token');
+     }
+ 
+     // ✅ Fetch user
+     const new_user = await User.findOne({ where: { customer_id: decoded.customer_id } });
+     if (!new_user) {
+         throw new Error('User not found');
+     }
+ 
+     // ✅ Generate new access token
+     const accessToken = generateAccessToken(new_user);
+ 
+     return { accessToken };
 };
 
-export { authenticateUser, refreshAccessToken, registerUser}
+const logoutUser = async (refreshToken) => {
+    await RefreshToken.destroy({ where: { token: refreshToken } });
+};
+
+export { authenticateUser, refreshAccessToken, registerUser, logoutUser}
+

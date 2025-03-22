@@ -1,4 +1,4 @@
-import { authenticateUser, refreshAccessToken, registerUser } from '../services/authServices.js';
+import { authenticateUser, refreshAccessToken, registerUser, logoutUser } from '../services/authServices.js';
 
 const signUp = async (req, res) => {
     try {
@@ -20,12 +20,18 @@ const signUp = async (req, res) => {
     }
 };
 
+
 const login = async (req, res) => {
     try {
         const { phone_number, password } = req.body;
-        const { accessToken, refreshToken } = await authenticateUser(phone_number, password);
+        const { accessToken, refreshToken, outputMessage } = await authenticateUser(phone_number, password);
 
-        return res.status(200).json({ success: true, accessToken, refreshToken });
+        return res.status(200).json({ 
+            success: true, 
+            accessToken, 
+            refreshToken, 
+            message: outputMessage
+        });
     } catch (error) {
         return res.status(401).json({ success: false, message: error.message });
     }
@@ -48,7 +54,18 @@ const refreshToken = async (req, res) => {
 };
 
 const logout = async (req, res) => {
-    return res.status(200).json({ success: true, message: 'Logged out successfully' });
+    try {
+        const { refreshToken } = req.body;
+        if (!refreshToken) {
+            return res.status(400).json({ success: false, message: 'Refresh token is required' });
+        }
+
+        await logoutUser(refreshToken);
+
+        res.status(200).json({ success: true, message: 'Logged out successfully' });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
 };
 
 export { login, refreshToken, logout, signUp };
