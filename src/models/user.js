@@ -8,6 +8,11 @@ const User = sequelize.define('User', {
         primaryKey: true,
         allowNull: false,
     },
+    external_customer_id: {
+        type: DataTypes.STRING(55),
+        allowNull: true, // Only set after full KYC
+    },
+
     firstname: {
         type: DataTypes.STRING(55),
         allowNull: false,

@@ -1,4 +1,5 @@
 import User from '../models/user.js';
+import axios from 'axios';
 
 const checkKYC = async (req, res, next) => {
     try {

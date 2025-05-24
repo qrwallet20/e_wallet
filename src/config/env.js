@@ -17,3 +17,5 @@ export const MAX_RETRIES = process.env.MAX_RETRIES;
 export const RETRY_DELAY = process.env.RETRY_DELAY;
 
 export const MAX_REQUEST = process.env.MAX_REQUEST;
+
+export const API_KEY = process.env.API_KEY;

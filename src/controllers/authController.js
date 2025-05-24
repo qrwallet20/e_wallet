@@ -1,10 +1,11 @@
 import { authenticateUser, refreshAccessToken, registerUser, logoutUser } from '../services/authServices.js';
 
+
 const signUp = async (req, res) => {
     try {
-        const { firstname, lastname, password, phone_number } = req.body;
+        const { firstname, lastname, email,password, phone_number } = req.body;
 
-        const user = await registerUser(firstname, lastname, password, phone_number);
+        const user = await registerUser(firstname, lastname, email, password, phone_number);
 
         return res.status(201).json({
             success: true,
@@ -30,7 +31,8 @@ const login = async (req, res) => {
             success: true, 
             accessToken, 
             refreshToken, 
-            message: outputMessage
+            message: outputMessage,
+           
         });
     } catch (error) {
         return res.status(401).json({ success: false, message: error.message });

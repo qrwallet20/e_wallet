@@ -3,7 +3,8 @@ import User from '../models/user.js';
 import {v4 as uuid} from 'uuid';
 import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from '../utilities/tokenUtils.js';
 import RefreshToken from '../models/refreshToken.js';
-
+import https from "https";
+import {options} from '../utilities/connection.js';
 
 
 
@@ -55,10 +56,12 @@ const registerUser = async (firstname, lastname, password, phone_number) => {
         customer_id: uuid(),
         firstname,
         lastname,
+        email,
         password: hashedPassword,
         phone_number
     });
-
+    //paystack customer
+    createPaystackCustomer();
     return new_user;
 };
 
@@ -123,6 +126,50 @@ const refreshAccessToken = async (refreshToken) => {
 const logoutUser = async (refreshToken) => {
     await RefreshToken.destroy({ where: { token: refreshToken } });
 };
+
+const createPaystackCustomer= async () => {
+    try{
+
+        const params = JSON.stringify({
+            "email": email,
+            "first_name": first_name,
+            "last_name": last_name,
+            "phone": phone_number
+          })
+
+        options.path = "/customer";
+        options.method = "POST";
+        options;
+
+        
+
+          const req = https.request(options, res => {
+            let data = ''
+          
+            res.on('data', (chunk) => {
+              data += chunk
+            });
+          
+            res.on('end', () => {
+              console.log(JSON.parse(data))
+            })
+          }).on('error', error => {
+            console.error(error)
+          })
+          
+          req.write(params)
+          req.end()
+    }
+    catch (error) {
+        return res.status(403).json({ success: false, message: 'Something went wrong' });
+    }
+}
+
+
+
+
+
+
 
 export { authenticateUser, refreshAccessToken, registerUser, logoutUser}
 

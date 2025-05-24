@@ -2,7 +2,7 @@ import { DataTypes } from 'sequelize';
 import sequelize from '../config/database.js';
 import User from './user.js'; 
 
-const account = sequelize.define('account', {
+const Account = sequelize.define('Account', {
     account_number: {
         type: DataTypes.STRING(10), 
         allowNull: false,
@@ -17,6 +17,18 @@ const account = sequelize.define('account', {
         },
         onDelete: 'CASCADE', 
     },
+    account_tier:{
+        type: DataTypes.STRING(55),
+        allowNull: false
+    },
+    status: {
+        type: DataTypes.STRING(55),
+        allowNull: false
+    },
+    bank_name: {
+        type: DataTypes.STRING(55),
+        allowNull: false
+    },
     balance: {
         type: DataTypes.DECIMAL(10, 2), 
         allowNull: false,
@@ -30,4 +42,4 @@ const account = sequelize.define('account', {
     tableName: 'account',
 });
 
-export default account;
+export default Account;
