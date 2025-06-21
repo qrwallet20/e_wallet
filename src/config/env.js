@@ -19,3 +19,13 @@ export const RETRY_DELAY = process.env.RETRY_DELAY;
 export const MAX_REQUEST = process.env.MAX_REQUEST;
 
 export const API_KEY = process.env.API_KEY;
+
+// Embedly.ng API Configuration
+export const EMBEDLY_API_KEY = ""; 
+
+export const EMBEDLY_BASE_URL = process.env.EMBEDLY_BASE_URL; //test URL CHANGE TO PROD EVENTUALLY
+
+// For staging/testing - remove in production
+export const EMBEDLY_STAGING_KEY = process.env.EMBEDLY_STAGING_KEY;
+export const EMBEDLY_ORGANIZATION_ID = process.env.EMBEDLY_ORGANIZATION_ID;
+export const EMBEDLY_NIN_KYC_KEY = process.env.EMBEDLY_NIN_KYC_KEY;

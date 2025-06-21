@@ -3,12 +3,7 @@ import User from '../models/user.js';
 import {v4 as uuid} from 'uuid';
 import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from '../utilities/tokenUtils.js';
 import RefreshToken from '../models/refreshToken.js';
-import https from "https";
-import {options} from '../utilities/connection.js';
-
-
-
-
+import { embedlyAPI, EMBEDLY_ORGANIZATION_ID } from '../utilities/embedlyConnection.js';
 
 // Utility function to validate phone numbers (Nigerian format)
 const isValidPhoneNumber = (phone_number) => {
@@ -22,10 +17,9 @@ const isValidPassword = (password) => {
     return regex.test(password);
 };
 
-
-const registerUser = async (firstname, lastname, password, phone_number) => {
+const registerUser = async (firstname, lastname, email, password, phone_number) => {
     // Validation
-    if (!firstname || !lastname || !password || !phone_number) {
+    if (!firstname || !lastname || !email || !password || !phone_number) {
         throw new Error('All fields are required');
     }
 
@@ -42,30 +36,84 @@ const registerUser = async (firstname, lastname, password, phone_number) => {
     }
 
     // Check if user already exists
-    const existingUser = await User.findOne({ where: { phone_number } });
+    const existingUser = await User.findOne({ 
+        where: { 
+            $or: [
+                { phone_number },
+                { email }
+            ]
+        } 
+    });
+    
     if (existingUser) {
-        throw new Error('Phone number already registered');
+        throw new Error('Phone number or email already registered');
     }
 
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
+    const customer_id = uuid();
 
-
-    // Create user
+    // Create user in local database first
     const new_user = await User.create({
-        customer_id: uuid(),
+        customer_id,
         firstname,
         lastname,
         email,
         password: hashedPassword,
-        phone_number
+        phone_number,
+        organization_id: EMBEDLY_ORGANIZATION_ID
     });
-    //paystack customer
-    createPaystackCustomer();
-    return new_user;
+
+    // Create customer in Embedly
+    try {
+        await createEmbedlyCustomer(new_user);
+    } catch (error) {
+        console.error('Failed to create Embedly customer:', error);
+        // Don't fail registration if Embedly creation fails
+        // User can complete this during KYC
+    }
+
+    return {
+        customer_id: new_user.customer_id,
+        firstname: new_user.firstname,
+        lastname: new_user.lastname,
+        email: new_user.email,
+        phone_number: new_user.phone_number,
+        kyc_status: new_user.kyc_status
+    };
 };
 
+const createEmbedlyCustomer = async (user) => {
+    try {
+        const customerData = {
+            organizationId: EMBEDLY_ORGANIZATION_ID,
+            firstName: user.firstname,
+            lastName: user.lastname,
+            email: user.email,
+            phoneNumber: user.phone_number,
+            // Add other required fields based on Embedly documentation
+        };
 
+        const response = await embedlyAPI.post('/customers', customerData);
+        
+        if (response.data && response.data.customerId) {
+            // Update user with Embedly customer ID
+            await User.update(
+                { 
+                    embedly_customer_id: response.data.customerId,
+                    organization_id: EMBEDLY_ORGANIZATION_ID
+                },
+                { where: { customer_id: user.customer_id } }
+            );
+            
+            console.log('Embedly customer created successfully:', response.data.customerId);
+            return response.data;
+        }
+    } catch (error) {
+        console.error('Error creating Embedly customer:', error.response?.data || error.message);
+        throw error;
+    }
+};
 
 const authenticateUser = async (phone_number, password) => {
     const current_user = await User.findOne({ where: { phone_number } });
@@ -74,102 +122,60 @@ const authenticateUser = async (phone_number, password) => {
         throw new Error('User does not exist');
     }
 
-    // Fix: Use `await` for `bcrypt.compare`
     const isPasswordValid = await bcrypt.compare(password, current_user.password);
     if (!isPasswordValid) {
         throw new Error('Invalid phone number or password');
     }
 
-    const outputMessage = (current_user.kyc_update === 'Uncompleted') 
-    ? 'Login successful, but KYC is incomplete. You must complete KYC before making transactions.' 
-    : 'Login successful';
-
+    const outputMessage = (current_user.kyc_status !== 'VERIFIED') 
+        ? 'Login successful, but KYC verification is required for full access.' 
+        : 'Login successful';
 
     const accessToken = generateAccessToken(current_user);
     const refreshToken = generateRefreshToken(current_user);
 
-    // Fix: Use `current_user.customer_id`, not `new_user.customer_id`
     await RefreshToken.create({
         customer_id: current_user.customer_id,
         token: refreshToken,
         expires_at: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000), // 15 days
     });
 
-    return { accessToken, refreshToken, outputMessage };
+    return { 
+        accessToken, 
+        refreshToken, 
+        outputMessage,
+        user: {
+            customer_id: current_user.customer_id,
+            firstname: current_user.firstname,
+            lastname: current_user.lastname,
+            email: current_user.email,
+            kyc_status: current_user.kyc_status
+        }
+    };
 };
 
 const refreshAccessToken = async (refreshToken) => {
-     // ✅ Check if refresh token exists in the database
-     const storedToken = await RefreshToken.findOne({ where: { token: refreshToken } });
-     if (!storedToken) {
-         throw new Error('Invalid or expired refresh token');
-     }
- 
-     // ✅ Verify refresh token
-     const decoded = verifyRefreshToken(refreshToken);
-     if (!decoded) {
-         throw new Error('Invalid or expired refresh token');
-     }
- 
-     // ✅ Fetch user
-     const new_user = await User.findOne({ where: { customer_id: decoded.customer_id } });
-     if (!new_user) {
-         throw new Error('User not found');
-     }
- 
-     // ✅ Generate new access token
-     const accessToken = generateAccessToken(new_user);
- 
-     return { accessToken };
+    const storedToken = await RefreshToken.findOne({ where: { token: refreshToken } });
+    if (!storedToken) {
+        throw new Error('Invalid or expired refresh token');
+    }
+
+    const decoded = verifyRefreshToken(refreshToken);
+    if (!decoded) {
+        throw new Error('Invalid or expired refresh token');
+    }
+
+    const user = await User.findOne({ where: { customer_id: decoded.customer_id } });
+    if (!user) {
+        throw new Error('User not found');
+    }
+
+    const accessToken = generateAccessToken(user);
+    return accessToken;
 };
 
 const logoutUser = async (refreshToken) => {
     await RefreshToken.destroy({ where: { token: refreshToken } });
 };
 
-const createPaystackCustomer= async () => {
-    try{
-
-        const params = JSON.stringify({
-            "email": email,
-            "first_name": first_name,
-            "last_name": last_name,
-            "phone": phone_number
-          })
-
-        options.path = "/customer";
-        options.method = "POST";
-        options;
-
-        
-
-          const req = https.request(options, res => {
-            let data = ''
-          
-            res.on('data', (chunk) => {
-              data += chunk
-            });
-          
-            res.on('end', () => {
-              console.log(JSON.parse(data))
-            })
-          }).on('error', error => {
-            console.error(error)
-          })
-          
-          req.write(params)
-          req.end()
-    }
-    catch (error) {
-        return res.status(403).json({ success: false, message: 'Something went wrong' });
-    }
-}
-
-
-
-
-
-
-
-export { authenticateUser, refreshAccessToken, registerUser, logoutUser}
-
+export { authenticateUser, refreshAccessToken, registerUser, logoutUser, createEmbedlyCustomer };
