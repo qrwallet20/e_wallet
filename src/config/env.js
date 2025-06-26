@@ -20,6 +20,8 @@ export const MAX_REQUEST = process.env.MAX_REQUEST;
 
 export const API_KEY = process.env.API_KEY;
 
+export const WEBHOOK_SECRET = "";
+
 // Embedly.ng API Configuration
 export const EMBEDLY_API_KEY = ""; 
 

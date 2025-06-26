@@ -1,27 +1,16 @@
 import crypto from 'crypto';
-import { WEBHOOK_SECRET, PAYSTACK_SECRET_KEY } from '../config/env.js';
+import { WEBHOOK_SECRET } from '../config/env.js';
 
 export const verifyWebhookSignature = (req, res, next) => {
     try {
-        const signature = req.headers['x-signature'] || req.headers['x-paystack-signature'];
+        const signature = req.headers['x-signature'] ;
         const body = req.body;
 
         if (!signature) {
             return res.status(400).json({ error: 'No signature header found' });
         }
 
-        // For Paystack webhooks
-        if (req.headers['x-paystack-signature']) {
-            const hash = crypto
-                .createHmac('sha512', PAYSTACK_SECRET_KEY)
-                .update(JSON.stringify(body))
-                .digest('hex');
-
-            if (hash !== signature) {
-                return res.status(400).json({ error: 'Invalid signature' });
-            }
-        }
-        // For other providers (Embedly, etc.)
+        // For other Embedly
         else if (req.headers['x-signature']) {
             const expectedSignature = crypto
                 .createHmac('sha256', WEBHOOK_SECRET)
