@@ -41,19 +41,27 @@ const login = async (req, res) => {
 
 const refreshToken = async (req, res) => {
     try {
-        const authHeader = req.headers.authorization;
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
-            return res.status(403).json({ success: false, message: 'Refresh token required' });
-        }
-
-        const refreshToken = authHeader.split(' ')[1];
-        const newAccessToken = await refreshAccessToken(refreshToken);
-
-        return res.status(200).json({ success: true, accessToken: newAccessToken });
-    } catch (error) {
-        return res.status(403).json({ success: false, message: error.message });
+      const raw = req.body.refreshToken;
+      if (!raw) {
+        return res
+          .status(400)
+          .json({ success: false, message: 'Refresh token required' });
+      }
+  
+      const { accessToken, refreshToken: newRefresh } =
+        await refreshAccessToken(raw);
+  
+      return res.status(200).json({
+        success: true,
+        accessToken,
+        refreshToken: newRefresh
+      });
+    } catch (err) {
+      return res
+        .status(403)
+        .json({ success: false, message: err.message });
     }
-};
+  };
 
 const logout = async (req, res) => {
     try {

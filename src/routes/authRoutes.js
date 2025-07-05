@@ -9,7 +9,7 @@ router.post('/sign-up', signUp);
 
 router.post('/login',login);
 
-router.post('/refresh-token',authMiddleware, refreshToken);
+router.post('/refresh-token', refreshToken);
 
 router.post('/logout', authMiddleware, logout);
 

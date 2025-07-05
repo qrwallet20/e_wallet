@@ -6,6 +6,12 @@ import webhookRoutes from './routes/webhookRoutes.js';
 import { syncDatabaseWithRetry } from './config/database.js';
 import { limiter } from './middlewares/rateLimit.js';
 import { webhookLimiter } from './middlewares/webhookMiddleware.js';
+import transactionsRouter from './routes/user.routes.js';
+import customersRouter from './routes/embedlyCustomers.js';
+
+
+
+
 
 const app = express();
 
@@ -48,6 +54,14 @@ app.use((error, req, res, next) => {
         ...(process.env.NODE_ENV === 'development' && { error: error.message })
     });
 });
+
+
+// Embedly specific routes
+// These routes handle transactions and customer management for Embedly
+
+
+app.use('/api/v1/embedly/transactions', transactionsRouter);
+app.use('/api/v1/embedly/customers', customersRouter);
 
 // Start the server
 (async () => {

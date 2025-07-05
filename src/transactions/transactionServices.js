@@ -1,137 +1,102 @@
-import { embedlyAPI } from '../utilities/embedlyConnection.js';
-import User from '../models/user.js';
 
-// Get wallet balance
-export const getWalletBalance = async (customer_id) => {
-    try {
-        const user = await User.findOne({ where: { customer_id } });
-        if (!user || !user.wallet_id) {
-            throw new Error('Wallet not found');
-        }
+import { transactions } from './embedlyClients.js';
+import User              from '../models/user.js';
+import { safeCall }      from '../utilities/apiWrapper.js';
 
-        const response = await embedlyAPI.get(`/wallets/${user.wallet_id}/balance`);
-        return response.data;
-    } catch (error) {
-        console.error('Error fetching wallet balance:', error.response?.data || error.message);
-        throw new Error('Failed to fetch wallet balance');
+async function resolveWallet(customer_id) {
+    const user = await User.findOne({ where: { customer_id }});
+    if (!user || !user.wallet_id) {
+      const err = new Error('Wallet not found');
+      err.status = 404;
+      throw err;
     }
-};
-
-// Transfer funds to bank account
-export const transferToBank = async ({
-    customer_id,
-    amount,
-    bankCode,
-    accountNumber,
-    accountName,
-    narration
-}) => {
-    try {
-        const user = await User.findOne({ where: { customer_id } });
-        if (!user || !user.wallet_id) {
-            throw new Error('Wallet not found');
-        }
-
-        if (user.kyc_status !== 'VERIFIED') {
-            throw new Error('KYC verification required for bank transfers');
-        }
-
-        const transferData = {
-            walletId: user.wallet_id,
-            amount: parseFloat(amount),
-            bankCode,
-            accountNumber,
-            accountName,
-            narration: narration || 'Bank transfer',
-            currency: 'NGN'
-        };
-
-        const response = await embedlyAPI.post('/payouts/bank', transferData);
-        return response.data;
-    } catch (error) {
-        console.error('Bank transfer error:', error.response?.data || error.message);
-        throw new Error(error.response?.data?.message || 'Bank transfer failed');
+    if (user.kyc_status !== 'VERIFIED') {
+      const err = new Error('KYC verification required');
+      err.status = 403;
+      throw err;
     }
-};
+    return user.wallet_id;
+  }
 
-// Transfer funds between wallets
-export const transferToWallet = async ({
-    fromCustomerId,
-    toCustomerId,
-    amount,
-    narration
-}) => {
-    try {
-        const fromUser = await User.findOne({ where: { customer_id: fromCustomerId } });
-        const toUser = await User.findOne({ where: { customer_id: toCustomerId } });
-
-        if (!fromUser || !fromUser.wallet_id) {
-            throw new Error('Sender wallet not found');
-        }
-
-        if (!toUser || !toUser.wallet_id) {
-            throw new Error('Recipient wallet not found');
-        }
-
-        if (fromUser.kyc_status !== 'VERIFIED') {
-            throw new Error('Sender KYC verification required');
-        }
-
-        const transferData = {
-            fromWalletId: fromUser.wallet_id,
-            toWalletId: toUser.wallet_id,
-            amount: parseFloat(amount),
-            narration: narration || 'Wallet transfer',
-            currency: 'NGN'
-        };
-
-        const response = await embedlyAPI.post('/transfers/wallet', transferData);
-        return response.data;
-    } catch (error) {
-        console.error('Wallet transfer error:', error.response?.data || error.message);
-        throw new Error(error.response?.data?.message || 'Wallet transfer failed');
+  /**
+ * Get wallet balance
+ */
+export async function getWalletBalance(customer_id) {
+    const walletId = await resolveWallet(customer_id);
+    const res      = await safeCall(() => transactions.balance(walletId));
+    return res.data;
+  }
+  
+  /**
+   * Transfer funds to bank
+   */
+  export async function transferToBank(opts) {
+    const walletId = await resolveWallet(opts.customer_id);
+    const body     = {
+      walletId,
+      amount:       parseFloat(opts.amount),
+      bankCode:     opts.bankCode,
+      accountNumber:opts.accountNumber,
+      accountName:  opts.accountName,
+      narration:    opts.narration || 'Bank transfer',
+      currency:     'NGN'
+    };
+    const res = await safeCall(() => transactions.toBank(body));
+    return res.data;
+  }
+  
+  /**
+   * Transfer funds between wallets
+   */
+  export async function transferToWallet(opts) {
+    const fromWallet = await resolveWallet(opts.fromCustomerId);
+    // note: recipient needn’t be VERIFIED to receive
+    const toUser     = await User.findOne({ where:{ customer_id: opts.toCustomerId }});
+    if (!toUser || !toUser.wallet_id) {
+      const err = new Error('Recipient wallet not found');
+      err.status = 404;
+      throw err;
     }
-};
-
-// Get transaction history
-export const getTransactionHistory = async (customer_id, { page = 1, limit = 20 } = {}) => {
-    try {
-        const user = await User.findOne({ where: { customer_id } });
-        if (!user || !user.wallet_id) {
-            throw new Error('Wallet not found');
-        }
-
-        const response = await embedlyAPI.get(`/wallets/${user.wallet_id}/transactions`, {
-            params: { page, limit }
-        });
-
-        return response.data;
-    } catch (error) {
-        console.error('Error fetching transaction history:', error.response?.data || error.message);
-        throw new Error('Failed to fetch transaction history');
-    }
-};
-
-// Get list of supported banks
-export const getSupportedBanks = async () => {
-    try {
-        const response = await embedlyAPI.get('/banks');
-        return response.data;
-    } catch (error) {
-        console.error('Error fetching banks:', error.response?.data || error.message);
-        throw new Error('Failed to fetch supported banks');
-    }
-};
-
-// Verify bank account details
-export const verifyBankAccount = async ({ bankCode, accountNumber }) => {
-    try {
-        const response = await embedlyAPI.get('/banks/verify', {
-            params: { bankCode, accountNumber }
-        });
-        return response.data;
-    } catch (error) {
-        console.error('Bank verification error:', error.response?.data || error.message);
-        throw new Error('Failed to verify bank account');
-    }
-};
+    const body = {
+      fromWalletId: fromWallet,
+      toWalletId:   toUser.wallet_id,
+      amount:       parseFloat(opts.amount),
+      narration:    opts.narration || 'Wallet transfer',
+      currency:     'NGN'
+    };
+    const res = await safeCall(() => transactions.toWallet(body));
+    return res.data;
+  }
+  
+  /**
+   * Get transaction history (with paging)
+   */
+  export async function getTransactionHistory(customer_id, { page=1, limit=20 } = {}) {
+    const walletId = await resolveWallet(customer_id);
+    const res      = await safeCall(() =>
+      transactions.history(walletId, page, limit)
+    );
+    return {
+      data: res.data,
+      meta: res.meta    // if Embedly returns pagination in `meta`
+    };
+  }
+  
+  /**
+   * List supported banks
+   */
+  export async function listSupportedBanks() {
+    const res = await safeCall(() => transactions.banks());
+    return res.data;
+  }
+  
+  /**
+   * Verify a bank account
+   */
+  export async function verifyBankAccount({ bankCode, accountNumber }) {
+    const res = await safeCall(() =>
+      transactions.verifyBank(bankCode, accountNumber)
+    );
+    return res.data;
+  }
+  
