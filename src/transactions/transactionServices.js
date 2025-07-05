@@ -1,5 +1,5 @@
 
-import { transactions } from './embedlyClients.js';
+import { transactions } from '../utilities/embedlyClients.js';
 import User              from '../models/user.js';
 import { safeCall }      from '../utilities/apiWrapper.js';
 
@@ -71,14 +71,19 @@ export async function getWalletBalance(customer_id) {
   /**
    * Get transaction history (with paging)
    */
-  export async function getTransactionHistory(customer_id, { page=1, limit=20 } = {}) {
+  export async function getTransactionHistory(
+    customer_id,
+    { page = 1, limit = 20, type, status } = {}
+  ) {
     const walletId = await resolveWallet(customer_id);
-    const res      = await safeCall(() =>
-      transactions.history(walletId, page, limit)
+    // pass type/status through as well
+    const res = await safeCall(() =>
+      transactions.history(walletId, page, limit, type, status)
     );
+    // res.data is the Embedly body: { statuscode, message, data: [...], meta: {...} }
     return {
-      data: res.data,
-      meta: res.meta    // if Embedly returns pagination in `meta`
+      data: res.data.data,
+      meta: res.data.meta
     };
   }
   
