@@ -5,7 +5,7 @@ import User from './user.js';
 const Account = sequelize.define('Account', {
     account_number: {
         type: DataTypes.STRING(10), 
-        allowNull: false,
+        allowNull: true,
         unique: true,
     },
     customer_id: {
@@ -19,15 +19,28 @@ const Account = sequelize.define('Account', {
     },
     account_tier:{
         type: DataTypes.STRING(55),
-        allowNull: false
+        allowNull: true
     },
     status: {
         type: DataTypes.STRING(55),
-        allowNull: false
+        allowNull: true
+    },
+    account_number: {
+        type: DataTypes.STRING(10), 
+        allowNull: true,
+        unique: true,
+    },
+    walletId: {
+        type: DataTypes.STRING(55),
+        allowNull: true
     },
     bank_name: {
         type: DataTypes.STRING(55),
-        allowNull: false
+        allowNull: true
+    },
+    bank_code: {
+        type: DataTypes.STRING(55),
+        allowNull: true
     },
     balance: {
         type: DataTypes.DECIMAL(10, 2), 
@@ -36,6 +49,11 @@ const Account = sequelize.define('Account', {
         validate: {
             min: 0, 
         },
+    },
+    ledgerBalance: {
+        type: DataTypes.DECIMAL(10, 2), 
+        allowNull: false,
+        defaultValue: 0.00, 
     },
 }, {
     timestamps: true,

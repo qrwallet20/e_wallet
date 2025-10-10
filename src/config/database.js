@@ -2,6 +2,10 @@ import { DATABASE_URL, MAX_RETRIES, RETRY_DELAY } from './env.js';
 import { Sequelize } from 'sequelize';
 
 
+if (!DATABASE_URL) {
+  console.log('DATABASE_URL is not defined. Check your .env file or environment variables');
+}
+
 const sequelize = new Sequelize(DATABASE_URL, {
     dialect: 'postgres',
     logging: false,

@@ -1,19 +1,36 @@
 import bcrypt from 'bcrypt';
 import User from '../models/user.js';
 import { v4 as uuid } from 'uuid';
+import { sequelize } from '../config/database.js';
+import { Op } from 'sequelize';
+import { safeCall } from '../utilities/apiWrapper.js';
+import { customers } from '../transactions/embedlyClients.js';
 import {
   signAccessToken,
   signRefreshToken,
   verifyRefreshToken
 } from '../utilities/tokenUtils.js';
 import RefreshToken from '../models/refreshToken.js';
-import { embedlyAPI, EMBEDLY_ORGANIZATION_ID } from '../utilities/embedlyConnection.js';
+import { embedlyAPI as embedlyKYCAPI } from '../utilities/embedlyConnection.js';
+import { EMBEDLY_ORGANIZATION_ID,COUNTRY_ID } from '../config/env.js';
+import { sendMail } from '../utilities/nodeMailer.js';
+//import { verify } from 'jsonwebtoken';
 
 // Utility function to validate phone numbers (Nigerian format)
 const isValidPhoneNumber = (phone_number) => {
   const regex = /^(?:\+234|0)[7-9][01]\d{8}$/;
   return regex.test(phone_number);
 };
+
+// function toE164Nigeria(msisdn) {
+//   const s = String(msisdn).trim();
+//   if (s.startsWith('+234')) return s;
+//   if (s.startsWith('0') && s.length === 11) return '+234' + s.slice(1);
+//   // last resort: if already starts 234
+//   if (s.startsWith('234')) return '+' + s;
+//   return s; // leave as-is if unknown
+// }
+
 
 // Utility function to validate passwords (Minimum 8 chars, letters & numbers)
 const isValidPassword = (password) => {
@@ -24,19 +41,21 @@ const isValidPassword = (password) => {
 /**
  * Register a new user locally and in Embedly
  */
-const registerUser = async (
+const country_id = COUNTRY_ID;
+ const registerUser = async (
   firstname,
   lastname,
+  middlename,
   email,
   password,
   phone_number
 ) => {
-  // Validation
-  if (!firstname || !lastname || !email || !password || !phone_number) {
+  // 1) Basic validation
+  if (!firstname || !lastname || !middlename || !email || !password || !phone_number) {
     throw new Error('All fields are required');
   }
-  if (firstname.length < 2 || lastname.length < 2) {
-    throw new Error('First name and last name must be at least 2 characters long');
+  if (firstname.length < 2 || lastname.length < 2 || middlename.length < 2) {
+    throw new Error('First name, last name, and middle name must be at least 2 characters long');
   }
   if (!isValidPhoneNumber(phone_number)) {
     throw new Error('Invalid phone number format');
@@ -45,69 +64,154 @@ const registerUser = async (
     throw new Error('Password must be at least 8 characters long and include letters & numbers');
   }
 
-  // Check if user already exists
+  // 2) Uniqueness check
   const existingUser = await User.findOne({
     where: {
-      [User.sequelize.Op.or]: [{ phone_number }, { email }]
+      [Op.or]: [{ phone_number }, { email }]
     }
   });
   if (existingUser) {
     throw new Error('Phone number or email already registered');
   }
 
-  // Hash password
+  // 3) Pre-generate hash & ID
   const hashedPassword = await bcrypt.hash(password, 10);
   const customer_id = uuid();
 
-  // Create user locally
-  const new_user = await User.create({
-    customer_id,
-    firstname,
-    lastname,
-    email,
-    password: hashedPassword,
-    phone_number,
-    organization_id: EMBEDLY_ORGANIZATION_ID
+  // 4) Atomic create
+  return await sequelize.transaction(async (t) => {
+    
+    // a) Create the local user
+    const newUser = await User.create({
+      customer_id,
+      firstname,
+      lastname,
+      middlename,
+      email,
+      password: hashedPassword,
+      phone_number,
+      country_id
+    }, { transaction: t });
+
+    sendMail(email, "Yayyyy you joined the party!!!", `<p>Dear ${firstname} ${lastname},</p><p>Welcome to Wallet Platform</p><p>Your account has been successfully created. Kindly update your profilekj.</p>`);
+
+    // b) Tokens
+    const accessToken = signAccessToken(newUser);
+    const rawRefresh = signRefreshToken(newUser);
+    const refreshHash = await bcrypt.hash(rawRefresh, 10);
+    const expiresAt = new Date(Date.now() + 15 * 24 * 60 * 60 * 1000); // 15 days
+
+    await RefreshToken.create({
+      token_hash: refreshHash,
+      customer_id,
+      expires_at: expiresAt
+    }, { transaction: t });
+
+    return {
+      success: true,
+      customer_id,
+      accessToken,
+      refreshToken: rawRefresh
+    };
   });
-
-  // Create customer in Embedly (best effort)
-  try {
-    await createEmbedlyCustomer(new_user);
-  } catch (error) {
-    console.error('Failed to create Embedly customer:', error);
-  }
-
-  return {
-    customer_id: new_user.customer_id,
-    firstname: new_user.firstname,
-    lastname: new_user.lastname,
-    email: new_user.email,
-    phone_number: new_user.phone_number,
-    kyc_status: new_user.kyc_status
-  };
 };
 
-/**
- * Wrap Embedly customer creation
- */
-const createEmbedlyCustomer = async (user) => {
-  const customerData = {
-    organizationId: EMBEDLY_ORGANIZATION_ID,
+const ensureEmbedlyCustomerAndSyncNames = async (user) => {
+  const firstName  = user.firstname;
+  const middleName = user.middlename;
+  const lastName   = user.lastname;
+  const email      = user.email;
+  const phoneNumber = user.phone_number;
+
+  // If we already have an Embedly id, try to fetch that customer
+  if (user.embedly_customer_id) {
+    const getRes = await safeCall(() => customers.get(user.embedly_customer_id));
+    const found = getRes?.data?.data ?? getRes?.data ?? getRes;
+
+    if (found?.customerId) {
+      // Update names if they changed
+      const needsUpdate =
+        (firstName && firstName !== found.firstName) ||
+        (middleName && middleName !== found.middleName) ||
+        (lastName && lastName !== found.lastName);
+
+      if (needsUpdate) {
+        await safeCall(() =>
+          customers.update(user.embedly_customer_id, {
+            firstName,
+            middleName,
+            lastName
+          })
+        );
+      }
+      return found;
+    }
+    // If lookup failed, fall through and create anew
+  }
+
+  // Create a new Embedly customer (minimal fields needed here)
+  const createBody = {
+    organizationId: process.env.EMBEDLY_ORGANIZATION_ID,
     firstName: user.firstname,
+    middleName: user.middlename,
     lastName: user.lastname,
-    email: user.email,
-    phoneNumber: user.phone_number
+    emailAddress: user.email,        // required & correct casing
+    mobileNumber: user.phone_number, // required & correct casing
+    dob: user.dob,
+    address: user.address,
+    city: user.city,
+    countryId: user.country_id,
+    customerTypeId: process.env.CUSTOMER_TYPE_ID, // Use the environment variable for now
+    verify: "1"
   };
-  const response = await embedlyAPI.post('/customers', customerData);
-  if (response.data?.customerId) {
-    await User.update(
-      { embedly_customer_id: response.data.customerId },
-      { where: { customer_id: user.customer_id } }
-    );
-    console.log('Embedly customer created:', response.data.customerId);
-    return response.data;
+  console.log('[EMBEDLY CREATE] body:', createBody);
+
+  const addRes = await safeCall(() => customers.add(createBody));
+  const created = addRes?.data?.data ?? addRes?.data ?? addRes;
+  console.log('[EMBEDLY CREATE] raw:', addRes);
+  const customerId = addRes.data.id;
+
+  if (!customerId) {
+    const e = new Error('Failed to create Embedly customer');
+    e.status = 502;
+    throw e;
   }
+
+  // Persist the id locally
+  await User.update(
+    { embedly_customer_id: customerId },
+    { where: { customer_id: user.customer_id } }
+  );
+
+  return created;
 };
+
+// const createEmbedlyCustomer = async (user) => {
+//   const customerData = {
+//     organizationId: EMBEDLY_ORGANIZATION_ID,
+//     firstName: user.firstname,
+//     lastName: user.lastname,
+//     middleName: user.middlename,
+//     emailAddress: user.email,
+//     mobileNumber: user.phone_number,
+//     dob: user.dob,
+//     address: user.address,
+//     city: user.city,
+//     customerTypeId: user.customer_type_id,
+//     countryId: user.country_id,
+//     verify: 1
+//   };
+
+//   const res = await safeCall(() => customers.add(customerData));
+//   const customer = res.data.data;
+
+//   await User.update(
+//     { embedly_customer_id: customer.customerId },
+//     { where: { customer_id: user.customer_id } }
+//   );
+
+//   return customer;
+//};
 
 /**
  * Authenticate user and issue tokens
@@ -147,6 +251,7 @@ const authenticateUser = async (phone_number, password) => {
     user: {
       customer_id: current_user.customer_id,
       firstname: current_user.firstname,
+      middleName: current_user.middlename,
       lastname: current_user.lastname,
       email: current_user.email,
       kyc_status: current_user.kyc_status
@@ -222,5 +327,6 @@ export {
   refreshAccessToken,
   registerUser,
   logoutUser,
-  createEmbedlyCustomer
+ // createEmbedlyCustomer,
+  ensureEmbedlyCustomerAndSyncNames
 };

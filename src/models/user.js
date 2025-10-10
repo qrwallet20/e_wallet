@@ -25,6 +25,16 @@ const User = sequelize.define('User', {
         type: DataTypes.STRING(55),
         allowNull: false,
     },
+    middlename: {
+        type: DataTypes.STRING(55),
+        allowNull: false,
+    },
+
+    city: {
+        type: DataTypes.STRING(55),
+        allowNull: true,
+    },
+
     password: {
         type: DataTypes.STRING(125),
         allowNull: false,
@@ -50,7 +60,7 @@ const User = sequelize.define('User', {
         type: DataTypes.ENUM('Male', 'Female'),
         allowNull: true,
     },
-    DOB: {
+    dob: {
         type: DataTypes.DATEONLY,
         allowNull: true,
     },
@@ -64,27 +74,32 @@ const User = sequelize.define('User', {
         allowNull: true,
         unique: true,
     },
+    country_id: {
+        type: DataTypes.STRING(100),
+        allowNull: true,
+        unique: false,
+    },
     // KYC status
-    kyc_status: {
+    nin_status: {
         type: DataTypes.ENUM('PENDING', 'VERIFIED', 'REJECTED', 'INCOMPLETE'),
         allowNull: false,
         defaultValue: 'INCOMPLETE',
     },
-    // Wallet information
-    wallet_id: {
-        type: DataTypes.STRING(100),
-        allowNull: true,
-    },
-    account_number: {
-        type: DataTypes.STRING(10), 
-        allowNull: true,
-        unique: true,
+    bvn_status: {
+        type: DataTypes.ENUM('PENDING', 'VERIFIED', 'REJECTED', 'INCOMPLETE'),
+        allowNull: false,
+        defaultValue: 'INCOMPLETE',
     },
     // Customer tier/level
     customer_tier: {
         type: DataTypes.STRING(20),
         allowNull: true,
         defaultValue: 'TIER_1'
+    },
+    customerType:{
+        type: DataTypes.STRING(55),
+        allowNull: true,
+        defaultValue: 'Individual'
     }
 }, {
     timestamps: true,

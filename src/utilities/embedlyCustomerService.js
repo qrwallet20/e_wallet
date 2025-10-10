@@ -1,5 +1,5 @@
 // src/services/embedlyCustomerService.js
-import { customers } from './embedlyClients.js';
+import { customers } from '../transactions/embedlyClients.js';
 import { safeCall }   from '../utilities/apiWrapper.js';
 
 /**

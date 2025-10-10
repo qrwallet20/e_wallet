@@ -3,9 +3,9 @@ import { authenticateUser, refreshAccessToken, registerUser, logoutUser } from '
 
 const signUp = async (req, res) => {
     try {
-        const { firstname, lastname, email,password, phone_number } = req.body;
+        const { firstname, lastname, middlename, email, password, phone_number } = req.body;
 
-        const user = await registerUser(firstname, lastname, email, password, phone_number);
+        const user = await registerUser(firstname, lastname, middlename, email, password, phone_number);
 
         return res.status(201).json({
             success: true,

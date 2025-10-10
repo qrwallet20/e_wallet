@@ -11,8 +11,8 @@ const checkKYC = async (req, res, next) => {
             return res.status(404).json({ success: false, message: 'User not found' });
         }
 
-        if (new_user.kyc_update !== 'Completed') {
-            return res.status(403).json({ success: false, message: 'KYC not completed. Complete KYC before making transactions.' });
+        if (new_user.nin_status !== 'VERIFIED') {
+            return res.status(403).json({ success: false, message: 'NIN verification not completed. Complete NIN verification before making transactions.' });
         }
 
         next(); // Allow transaction if KYC is completed

@@ -1,14 +1,14 @@
 // src/routes/embedlyCustomers.js
 import express from 'express';
-import auth from '../middlewares/authmiddleware.js';
-import { customers } from '../services/embedlyClients.js';
+import {authMiddleware} from '../middlewares/authmiddleware.js';
+import { customers } from '../transactions/embedlyClients.js';
 
 const router = express.Router();
 
 // Create a new Embedly customer (e.g. during sign-up)
 router.post(
   '/',
-  auth,
+  authMiddleware,
   async (req, res, next) => {
     try {
       const result = await customers.add(req.body);
@@ -22,7 +22,7 @@ router.post(
 // Get the current user's Embedly customer record
 router.get(
   '/me',
-  auth,
+  authMiddleware,
   async (req, res, next) => {
     try {
       const embedlyId = req.user.embedly_customer_id;
@@ -42,7 +42,7 @@ router.get(
 // Update the current user's Embedly customer record
 router.patch(
   '/me',
-  auth,
+  authMiddleware,
   async (req, res, next) => {
     try {
       const embedlyId = req.user.embedly_customer_id;

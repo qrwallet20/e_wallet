@@ -10,11 +10,11 @@ const UserDetails = async (req, res, next) => {
             return res.status(404).json({ success: false, message: 'User not found' });
         }
 
-        if (current_user.kyc_update !== 'Completed') {
-            return res.status(403).json({ success: true , message: 'KYC not completed. Complete KYC before making transactions.', name: current_user.firstname + current_user.lastname });
+        if (current_user.nin_status !== 'VERIFIED') {
+            return res.status(403).json({ success: true , message: 'NIN verification not completed. Complete NIN verification before making transactions.', name: current_user.firstname + current_user.lastname });
         }
 
-        if (current_user.kyc_update == 'Completed') {
+        if (current_user.nin_status == 'VERIFIED') {
             return res.status(403).json({ success: true , name: current_user.firstname + current_user.lastname,  });
         }
 
