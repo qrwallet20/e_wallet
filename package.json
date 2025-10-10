@@ -5,7 +5,8 @@
   "main": "app.js",
   "type": "module",
   "scripts": {
-    "clear-db": "node ./scripts/clearDb.js"
+    "clear-db": "node ./scripts/clearDb.js",
+    "start": "node src/app.js"
   },
   "author": "Sope",
   "license": "ISC",
