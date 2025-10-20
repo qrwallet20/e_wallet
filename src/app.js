@@ -44,8 +44,8 @@ const swaggerOptions = {
                 description: 'Local server'
             },
             {
-                url: 'https://api.example.com',
-                description: 'Production server'
+                url: 'https://ewallet-production.up.railway.app',
+                description: 'Staging server'
             }
         ],
         components: {
