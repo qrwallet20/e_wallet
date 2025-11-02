@@ -14,16 +14,9 @@ import { sendMail } from '../utilities/nodeMailer.js';
 
 // Validation helpers
 const isValidPin = (pin) => /^\d{4}$/.test(pin);
-const isValidNIN = (nin) => /^\d{11}$/.test(nin);
 const isValidEmail = (email) => validator.isEmail(email);
 
-/**
- * Update user KYC:
- * 1) Save local data (PENDING)
- * 2) Ensure/Sync Embedly customer (create if missing)
- * 3) Verify NIN against that customerId
- * 4) If verified → set VERIFIED and create wallet
- */
+
 export const updateKYC = async (req, res, next) => {
   try {
     const { pin, gender, dob, address, nin, email: emailInput, city } = req.body;
@@ -49,18 +42,7 @@ export const updateKYC = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Invalid email format' });
     }
 
-    // 2) Ensure NIN uniqueness
-    const conflict = await User.findOne({
-      where: { nin, customer_id: { [Op.ne]: customer_id } }
-    });
-    if (conflict) {
-      return res.status(400).json({
-        success: false,
-        message: 'NIN is already registered to another account'
-      });
-    }
-
-    // 3) Save/update local KYC fields (status = PENDING)
+    // Save/update local KYC fields (status = PENDING)
     const hashedPin = await bcrypt.hash(pin, 5);
     await User.update(
       { pin: hashedPin, email, gender, dob, address, nin, city, kyc_status: 'PENDING' },
@@ -184,8 +166,6 @@ export const updateNin = async (req, res, next) => {
 
 
 /// Under Testing
-///
-
 
 
 export const updateBvn = async (req, res, next) => {
@@ -367,20 +347,3 @@ export const getKYCStatus = async (req, res, next) => {
 //     return next(err);
 //   }
 // };
-
-
-
-
-
-
-export const getCustomerTierHandler = async (req, res, next) => {
-  try {
-    console.log('[TIER DEBUG] req.user:', req.user);
-    const customer_id = req.user.customer_id;
-    const tier = await getCustomerTier(customer_id);
-    return res.status(200).json({ success: true, tier });
-  } catch (err) {
-    console.error('[TIER DEBUG] Error in getCustomerTierHandler:', err.message);
-    next(err);
-  }
-};

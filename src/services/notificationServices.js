@@ -77,6 +77,8 @@ export const sendEmailNotification = async (email, notificationData) => {
     }
 };
 
+//Under Construction
+
 export const sendSMSNotification = async (phoneNumber, notificationData) => {
     if (!twilioClient) {
         console.log('Twilio not configured, skipping SMS notification');

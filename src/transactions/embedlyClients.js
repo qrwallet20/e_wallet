@@ -9,7 +9,7 @@ if (!EMBEDLY_STAGING_KEY || !EMBEDLY_BASE_URL) {
 }
 
 //
-// 🧾 Customer Endpoints
+// Customer Endpoints
 //
 export const customers = {
   add: async (body) => {
@@ -32,7 +32,7 @@ export const customers = {
 
 
 //
-// 💰 Wallet + Transaction Endpoints
+// Wallet + Transaction Endpoints
 //
 export const transactions = {
   balance: async (accountNumber) => {

@@ -48,7 +48,8 @@ const country_id = COUNTRY_ID;
   middlename,
   email,
   password,
-  phone_number
+  phone_number,
+  nin
 ) => {
   // 1) Basic validation
   if (!firstname || !lastname || !middlename || !email || !password || !phone_number) {
@@ -63,6 +64,23 @@ const country_id = COUNTRY_ID;
   if (!isValidPassword(password)) {
     throw new Error('Password must be at least 8 characters long and include letters & numbers');
   }
+  const isValidNIN = (nin) => /^\d{11}$/.test(nin);
+  if (!isValidNIN(nin)) {
+    throw new Error('Invalid NIN format');
+  }
+
+
+  // 2) Ensure NIN uniqueness
+      const conflict = await User.findOne({
+        where: { nin, customer_id: { [Op.ne]: customer_id } }
+      });
+      if (conflict) {
+        return res.status(400).json({
+          success: false,
+          message: 'NIN is already registered to another account'
+        });
+      }
+  
 
   // 2) Uniqueness check
   const existingUser = await User.findOne({
@@ -90,7 +108,8 @@ const country_id = COUNTRY_ID;
       email,
       password: hashedPassword,
       phone_number,
-      country_id
+      country_id,
+      nin
     }, { transaction: t });
 
     sendMail(email, "Yayyyy you joined the party!!!", `<p>Dear ${firstname} ${lastname},</p><p>Welcome to Wallet Platform</p><p>Your account has been successfully created. Kindly update your profilekj.</p>`);

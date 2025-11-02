@@ -25,11 +25,6 @@ const Account = sequelize.define('Account', {
         type: DataTypes.STRING(55),
         allowNull: true
     },
-    account_number: {
-        type: DataTypes.STRING(10), 
-        allowNull: true,
-        unique: true,
-    },
     walletId: {
         type: DataTypes.STRING(55),
         allowNull: true

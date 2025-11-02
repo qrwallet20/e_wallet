@@ -20,16 +20,12 @@ import userRoute from './routes/user.js';
 
 const app = express();
 
-// Webhook routes (must come before express.json() middleware)
-// Webhooks need raw body for signature verification
-
 
 // Regular middleware
 app.use(express.json());
 app.use(limiter);
 
 // Swagger API documentation
-//const router = express.Router();
 const swaggerOptions = {
     definition: {
         openapi: '3.0.0',
@@ -82,7 +78,7 @@ app.get('/health', (req, res) => {
     });
 });
 
-// 404 handler
+
 
 
 // Global error handler
@@ -111,7 +107,7 @@ app.use((req, res, next) => {
 });
 
 
-
+// 404 handler
 app.use('*', (req, res) => {
     res.status(404).json({
         success: false,
