@@ -7,7 +7,7 @@ import { getSupportedCurrencies } from '../transactions/transactionServices.js';
 import Account from '../models/account.js';
 import { sendMail } from '../utilities/nodeMailer.js';
 import User from '../models/user.js';
-import { checkId,updateKYC, getKYCStatus, getCustomerTierHandler, updateNin, updateBvn } from '../controllers/kycController.js';
+import { checkId,updateKYC, getKYCStatus, updateNin, updateBvn } from '../controllers/kycController.js';
 import {
   getWallet,
   transferToBank,
@@ -226,21 +226,21 @@ router.post('/kyc/update', authMiddleware, updateKYC);
  */
 router.get('/kyc/status', authMiddleware, getKYCStatus);
 
-/**
- * @swagger
- * /user/tier:
- *   get:
- *     summary: Get customer tier
- *     tags: [KYC]
- *     security:
- *       - BearerAuth: []
- *     responses:
- *       200:
- *         description: Customer tier information
- *       401:
- *         description: Unauthorized
- */
-router.get('/tier', authMiddleware, getCustomerTierHandler);
+// /**
+//  * @swagger
+//  * /user/tier:
+//  *   get:
+//  *     summary: Get customer tier
+//  *     tags: [KYC]
+//  *     security:
+//  *       - BearerAuth: []
+//  *     responses:
+//  *       200:
+//  *         description: Customer tier information
+//  *       401:
+//  *         description: Unauthorized
+//  */
+// router.get('/tier', authMiddleware, getCustomerTierHandler);
 
 /**
  * @swagger
