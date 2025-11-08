@@ -95,7 +95,7 @@ const router = express.Router();
  *         remarks:    { type: string, example: "Savings transfer" }
  *         amount:     { type: number, example: 1500 }
  *         pin:        { type: string, example: "1234" }
- *         transactionToken: {type: string, example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."}
+ *         transactionToken: { type: string, example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." }
  *     TransferToWalletRequest:
  *       type: object
  *       required: [toAccount, amount, pin, transactionToken]
@@ -104,7 +104,7 @@ const router = express.Router();
  *         amount:    { type: number, example: 2000 }
  *         narration: { type: string, example: "Dinner split" }
  *         pin:       { type: string, example: "1234" }
- *        transactionToken: {type: string, example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."}
+ *         transactionToken: { type: string, example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." }
  *     ResolveBankNameRequest:
  *       type: object
  *       required: [bankCode, accountNumber]
@@ -225,7 +225,7 @@ router.post('/kyc/update', authMiddleware, updateKYC);
  *         description: Unauthorized
  *       404:
  *         description: No verification properties or customer not found
- *       5XX:
+ *       500:
  *         description: Upstream error forwarded
  */
 router.get('/kyc/status', authMiddleware, getKYCStatus);
