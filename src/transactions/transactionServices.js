@@ -7,6 +7,7 @@ import dotenv from 'dotenv';
 import { sequelize } from '../config/database.js';
 import bcrypt from 'bcrypt';
 import { sendMail } from '../utilities/nodeMailer.js';
+import { verifyTransactionToken } from '../utilities/duplicateTransaction.js';
 import { EMBEDLY_ORGANIZATION_ID, CURRENCY_ID } from '../config/env.js';
 dotenv.config();
 
@@ -37,6 +38,12 @@ export async function transferToBank(opts) {
   if (!isPasswordValid) {
     throw new Error('Invalid pin');
   }
+
+  if (  verifyTransactionToken(opts.transactionToken) === true ) {
+    const err = new Error('Duplicate transaction detected, tray again in few minutes');
+    throw err;
+  }
+  
   const generateTransactionRef = () => {
     const timestamp = Date.now().toString(36); // Convert to base36 for compactness
     const randomStr = Math.random().toString(36).substring(2, 8); // Random string
@@ -60,7 +67,7 @@ export async function transferToBank(opts) {
 }
 
 export async function transferToWallet(opts) {
-  console.log("Transfer to wallet called with opts:", opts);
+  //console.log("Transfer to wallet called with opts:", opts);
   //const fromWallet = await resolveWallet(opts.fromCustomerId);
   const fromAccount = await User.findOne({ where: { customer_id: opts.fromCustomerId } });
   const accountDetails = await Account.findOne({ where: { customer_id: opts.fromCustomerId } });
@@ -78,6 +85,10 @@ export async function transferToWallet(opts) {
   if (!accountDetails || !accountDetails.account_number) {
     const err = new Error('Sender account not found');
     err.status = 404;
+    throw err;
+  }
+  if (verifyTransactionToken(opts.transactionToken) === true) {
+    const err = new Error('Duplicate transaction detected, tray again in few minutes');
     throw err;
   }
   const body = {

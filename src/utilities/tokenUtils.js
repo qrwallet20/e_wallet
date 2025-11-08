@@ -35,6 +35,8 @@ export function signRefreshToken(user) {
   });
 }
 
+
+
 export function verifyAccessToken(token) {
   return jwt.verify(token, ACCESS_TOKEN_SECRET);
 }

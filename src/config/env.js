@@ -13,6 +13,8 @@ export const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET;
 
 export const ACCESS_TOKEN_EXPIRY = '15m';
 
+export const TRANSACTION_TOKEN_EXPIRY = '2m';
+
 export const REFRESH_TOKEN_EXPIRY = '15d';
 
 export const MAX_RETRIES = process.env.MAX_RETRIES;
@@ -22,6 +24,8 @@ export const RETRY_DELAY = process.env.RETRY_DELAY;
 export const MAX_REQUEST = process.env.MAX_REQUEST;
 
 export const API_KEY = process.env.API_KEY;
+
+export const TRANSACTION_TOKEN_SECRET = process.env.TRANSACTION_TOKEN_SECRET;
 
 export const WEBHOOK_SECRET = "";
 

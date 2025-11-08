@@ -7,6 +7,7 @@ import { getSupportedCurrencies } from '../transactions/transactionServices.js';
 import Account from '../models/account.js';
 import { sendMail } from '../utilities/nodeMailer.js';
 import User from '../models/user.js';
+import { signTransactionToken } from '../utilities/duplicateTransaction.js';
 import { checkId,updateKYC, getKYCStatus, updateNin, updateBvn } from '../controllers/kycController.js';
 import {
   getWallet,
@@ -17,6 +18,7 @@ import {
   verifyBankAccount,
   getBankAccountName
 } from '../transactions/transactionServices.js';
+import transaction from '../models/transaction.js';
 
 const router = express.Router();
 
@@ -85,7 +87,7 @@ const router = express.Router();
  *           description: BVN associated with the user
  *     TransferToBankRequest:
  *       type: object
- *       required: [bankCode, accountNumber, accountName, amount, pin]
+ *       required: [bankCode, accountNumber, accountName, amount, pin, transactionToken]
  *       properties:
  *         bankCode:   { type: string, example: "999" }
  *         accountNumber: { type: string, example: "0123456789" }
@@ -93,14 +95,16 @@ const router = express.Router();
  *         remarks:    { type: string, example: "Savings transfer" }
  *         amount:     { type: number, example: 1500 }
  *         pin:        { type: string, example: "1234" }
+ *         transactionToken: {type: string, example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."}
  *     TransferToWalletRequest:
  *       type: object
- *       required: [toAccount, amount, pin]
+ *       required: [toAccount, amount, pin, transactionToken]
  *       properties:
  *         toAccount: { type: string, description: "Recipient wallet/account identifier", example: "2348012345678" }
  *         amount:    { type: number, example: 2000 }
  *         narration: { type: string, example: "Dinner split" }
  *         pin:       { type: string, example: "1234" }
+ *        transactionToken: {type: string, example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."}
  *     ResolveBankNameRequest:
  *       type: object
  *       required: [bankCode, accountNumber]
@@ -413,7 +417,7 @@ router.get('/wallet/balance', authMiddleware, checkKYC, async (req, res, next) =
 router.post('/transfer/bank', authMiddleware, checkKYC, async (req, res, next) => {
   try {
     const { customer_id } = req.user;
-    const { bankCode, accountNumber, accountName, remarks, amount, pin } = req.body;
+    const { bankCode, accountNumber, accountName, remarks, amount, pin, transactionToken } = req.body;
 
     if (!amount || !accountNumber || !accountName || !bankCode || !pin) {
       return res.status(400).json({
@@ -422,7 +426,7 @@ router.post('/transfer/bank', authMiddleware, checkKYC, async (req, res, next) =
       });
     }
 
-    const data = await transferToBank({ customer_id, bankCode, accountNumber, accountName, remarks, amount, pin });
+    const data = await transferToBank({ customer_id, bankCode, accountNumber, accountName, remarks, amount, pin, transactionToken });
     res.status(200).json({ success: true, data });
 
     const user = await User.findOne({ where: { customer_id }, attributes: ['firstname', 'lastname', 'email'] });
@@ -433,6 +437,11 @@ router.post('/transfer/bank', authMiddleware, checkKYC, async (req, res, next) =
     );
   } catch (err) {
     next(err);
+  }
+  finally{
+    const { accountNumber, amount } = req.body;
+    const transactionToken = signTransactionToken(accountNumber, amount);
+    res.json(transactionToken);
   }
 });
 
@@ -462,7 +471,7 @@ router.post('/transfer/bank', authMiddleware, checkKYC, async (req, res, next) =
 router.post('/transfer/wallet', authMiddleware, checkKYC, async (req, res, next) => {
   try {
     const { customer_id } = req.user;
-    const { toAccount, amount, narration, pin } = req.body;
+    const { toAccount, amount, narration, pin, transactionToken } = req.body;
 
     if (!amount || !toAccount || !pin) {
       return res.status(400).json({
@@ -471,7 +480,7 @@ router.post('/transfer/wallet', authMiddleware, checkKYC, async (req, res, next)
       });
     }
 
-    const input = { fromCustomerId: customer_id, toCustomerAccount: toAccount, amount, narration, pin };
+    const input = { fromCustomerId: customer_id, toCustomerAccount: toAccount, amount, narration, pin, transactionToken };
     const data = await transferToWallet(input);
 
     const user = await User.findOne({ where: { customer_id }, attributes: ['firstname', 'lastname', 'email'] });
@@ -484,6 +493,11 @@ router.post('/transfer/wallet', authMiddleware, checkKYC, async (req, res, next)
     );
   } catch (err) {
     next(err);
+  }
+  finally{
+    const { toAccount, amount } = req.body;
+    const transactionToken = signTransactionToken(toAccount, amount);
+    res.json(transactionToken);
   }
 });
 
