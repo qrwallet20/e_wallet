@@ -417,7 +417,7 @@ router.get('/wallet/balance', authMiddleware, checkKYC, async (req, res, next) =
 router.post('/transfer/bank', authMiddleware, checkKYC, async (req, res, next) => {
   try {
     const { customer_id } = req.user;
-    const { bankCode, accountNumber, accountName, remarks, amount, pin, transactionToken } = req.body;
+    const { bankCode, accountNumber, accountName, remarks, amount, pin } = req.body;
 
     if (!amount || !accountNumber || !accountName || !bankCode || !pin) {
       return res.status(400).json({
@@ -425,6 +425,8 @@ router.post('/transfer/bank', authMiddleware, checkKYC, async (req, res, next) =
         message: 'Fields required: amount, account_number, account_name, bank_code, pin'
       });
     }
+
+    const transactionToken = signTransactionToken(accountNumber, amount);
 
     const data = await transferToBank({ customer_id, bankCode, accountNumber, accountName, remarks, amount, pin, transactionToken });
     res.status(200).json({ success: true, data });
@@ -439,9 +441,9 @@ router.post('/transfer/bank', authMiddleware, checkKYC, async (req, res, next) =
     next(err);
   }
   finally{
-    const { accountNumber, amount } = req.body;
-    const transactionToken = signTransactionToken(accountNumber, amount);
-    res.json(transactionToken);
+    // const { accountNumber, amount } = req.body;
+    // const transactionToken = signTransactionToken(accountNumber, amount);
+    // res.json(transactionToken);
   }
 });
 
@@ -468,10 +470,59 @@ router.post('/transfer/bank', authMiddleware, checkKYC, async (req, res, next) =
  *       403:
  *         description: KYC required or PIN invalid
  */
+
+// router.post('/transfer/wallet', authMiddleware, checkKYC, async (req, res, next) => {
+//   try {
+//     const { customer_id } = req.user;
+//     const { toAccount, amount, narration, pin } = req.body;
+
+//     if (!amount || !toAccount || !pin) {
+//       return res.status(400).json({
+//         success: false,
+//         message: 'Fields required: amount, recipient_phone, pin'
+//       });
+//     }
+
+//     const transactionToken = signTransactionToken(toAccount, amount);
+
+//     // If you want to generate a token here, do it BEFORE calling transferToWallet
+//     // (but honestly this should be a separate endpoint).
+//     // const token = signTransactionToken(toAccount, amount);
+
+//     const input = {
+//       fromCustomerId: customer_id,
+//       toCustomerAccount: toAccount,
+//       toStoreId: storeId || null,     // ✅ pass storeId through
+//       amount,
+//       narration,
+//       pin,
+//       transactionToken
+//     };
+
+//     const data = await transferToWallet(input);
+
+//     const user = await User.findOne({
+//       where: { customer_id },
+//       attributes: ['firstname', 'lastname', 'email']
+//     });
+
+//     // Respond ONCE
+//     res.status(200).json({ success: true, data });
+
+//     // Non-blocking email (keep after response if you want)
+//     sendMail(
+//       user.email,
+//       'Wallet Transfer Initiated',
+//       `<p> Dear ${user.firstname} ${user.lastname},<br> Your transfer of ${amount} to account ${toAccount} has been initiated.</p>`
+//     );
+//   } catch (err) {
+//     next(err);
+//   }
+// });
 router.post('/transfer/wallet', authMiddleware, checkKYC, async (req, res, next) => {
   try {
     const { customer_id } = req.user;
-    const { toAccount, amount, narration, pin, transactionToken } = req.body;
+    const { toAccount, amount, narration, pin, storeCode } = req.body;
 
     if (!amount || !toAccount || !pin) {
       return res.status(400).json({
@@ -480,10 +531,25 @@ router.post('/transfer/wallet', authMiddleware, checkKYC, async (req, res, next)
       });
     }
 
-    const input = { fromCustomerId: customer_id, toCustomerAccount: toAccount, amount, narration, pin, transactionToken };
+    const transactionToken = signTransactionToken(toAccount, amount);
+
+    const input = {
+      fromCustomerId: customer_id,
+      toCustomerAccount: toAccount,
+      storeCode: storeCode,   // ✅ optional, passed through
+      amount,
+      narration,
+      pin,
+      transactionToken
+    };
+
     const data = await transferToWallet(input);
 
-    const user = await User.findOne({ where: { customer_id }, attributes: ['firstname', 'lastname', 'email'] });
+    const user = await User.findOne({
+      where: { customer_id },
+      attributes: ['firstname', 'lastname', 'email']
+    });
+
     res.status(200).json({ success: true, data });
 
     sendMail(
@@ -493,11 +559,8 @@ router.post('/transfer/wallet', authMiddleware, checkKYC, async (req, res, next)
     );
   } catch (err) {
     next(err);
-  }
-  finally{
-    const { toAccount, amount } = req.body;
-    const transactionToken = signTransactionToken(toAccount, amount);
-    res.json(transactionToken);
+  } finally {
+    // some shit
   }
 });
 

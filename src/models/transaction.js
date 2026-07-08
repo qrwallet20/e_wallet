@@ -1,68 +1,97 @@
+// src/models/transaction.js  (UPDATED - affected existing model)
 import { DataTypes } from 'sequelize';
-import {sequelize} from '../config/database.js';
+import { sequelize } from '../config/database.js';
 import User from './user.js';
+import Store from './store.js';
 
-const transaction = sequelize.define('transaction', {
+const transaction = sequelize.define(
+  'transaction',
+  {
     transaction_id: {
-        type: DataTypes.STRING(125), 
-        allowNull: false,
-        primaryKey: true, 
+      type: DataTypes.STRING(125),
+      allowNull: false,
+      primaryKey: true,
     },
+
     customer_id: {
-        type: DataTypes.STRING(55),
-        allowNull: false,
-        references: {
-            model: User,
-            key: 'customer_id',
-        },
-        onDelete: 'CASCADE', 
+      type: DataTypes.STRING(55),
+      allowNull: false,
+      references: {
+        model: User,
+        key: 'customer_id',
+      },
+      onDelete: 'CASCADE',
     },
+
+    // NEW: links txn to a store (nullable; if null => no points)
+    store_id: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      references: {
+        model: Store,
+        key: 'store_id',
+      },
+      onDelete: 'SET NULL',
+      onUpdate: 'CASCADE',
+    },
+
     transaction_date: {
-        type: DataTypes.DATE, 
-        allowNull: false,
-        defaultValue: DataTypes.NOW, 
+      type: DataTypes.DATE,
+      allowNull: false,
+      defaultValue: DataTypes.NOW,
     },
+
     transaction_type: {
-        type: DataTypes.ENUM('credit', 'debit'), 
-        allowNull: false,
+      type: DataTypes.ENUM('credit', 'debit'),
+      allowNull: false,
     },
+
     transaction_amount: {
-        type: DataTypes.DECIMAL(10,2), 
-        allowNull: false,
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: false,
     },
+
     initial_amount: {
-        type: DataTypes.DECIMAL(10,2), 
-        allowNull: false,
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: false,
     },
+
     final_amount: {
-        type: DataTypes.DECIMAL(10,2), 
-        allowNull: false,
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: false,
     },
+
     transaction_fee: {
-        type: DataTypes.DECIMAL(10,2), 
-        allowNull: false,
-        defaultValue: 0.00, 
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: false,
+      defaultValue: 0.0,
     },
+
     receiver_name: {
-        type: DataTypes.STRING(55), 
-        allowNull: true,
+      type: DataTypes.STRING(55),
+      allowNull: true,
     },
+
     sender_name: {
-        type: DataTypes.STRING(55), 
-        allowNull: true,
+      type: DataTypes.STRING(55),
+      allowNull: true,
     },
+
     receiver_bank: {
-        type: DataTypes.STRING(10), 
-        allowNull: false,
+      type: DataTypes.STRING(10),
+      allowNull: false,
     },
+
     status: {
-        type: DataTypes.ENUM('pending', 'completed', 'failed'), 
-        allowNull: false,
-        defaultValue: 'pending', 
+      type: DataTypes.ENUM('pending', 'completed', 'failed'),
+      allowNull: false,
+      defaultValue: 'pending',
     },
-}, {
-    timestamps: true, 
+  },
+  {
+    timestamps: true,
     tableName: 'transaction',
-});
+  }
+);
 
 export default transaction;

@@ -123,7 +123,7 @@ router.post('/sign-up', signUp);
  *       401:
  *         description: Invalid credentials
  */
-router.post('/login', authMiddleware, login);
+router.post('/login', login);
 
 /**
  * @swagger

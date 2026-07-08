@@ -2,13 +2,17 @@ import { transactions, customers } from './embedlyClients.js';
 import User from '../models/user.js';
 import Account from '../models/account.js';
 import { safeCall } from '../utilities/apiWrapper.js';
+import Transaction from '../models/transaction.js';
 import { embedlyAPI } from '../utilities/embedlyConnection.js';
 import dotenv from 'dotenv';
-import { sequelize } from '../config/database.js';
+import { sequelize } from '../config/database.js'; 
 import bcrypt from 'bcrypt';
 import { sendMail } from '../utilities/nodeMailer.js';
 import { verifyTransactionToken } from '../utilities/duplicateTransaction.js';
 import { EMBEDLY_ORGANIZATION_ID, CURRENCY_ID } from '../config/env.js';
+import Store from '../models/store.js';
+import PointHistory from '../models/pointHistory.js';
+
 dotenv.config();
 
 // async function resolveWallet(customer_id) {
@@ -67,41 +71,106 @@ export async function transferToBank(opts) {
 }
 
 export async function transferToWallet(opts) {
-  //console.log("Transfer to wallet called with opts:", opts);
-  //const fromWallet = await resolveWallet(opts.fromCustomerId);
   const fromAccount = await User.findOne({ where: { customer_id: opts.fromCustomerId } });
   const accountDetails = await Account.findOne({ where: { customer_id: opts.fromCustomerId } });
+
   const isPasswordValid = await bcrypt.compare(opts.pin, fromAccount.pin);
 
   const generateTransactionRef = () => {
-    const timestamp = Date.now().toString(36); // Convert to base36 for compactness
-    const randomStr = Math.random().toString(36).substring(2, 8); // Random string
+    const timestamp = Date.now().toString(36);
+    const randomStr = Math.random().toString(36).substring(2, 8);
     return `TX-${timestamp}-${randomStr}`;
   };
 
-  if (!isPasswordValid) {
-    throw new Error('Invalid pin');
-  }
+  if (!isPasswordValid) throw new Error('Invalid pin');
+
   if (!accountDetails || !accountDetails.account_number) {
     const err = new Error('Sender account not found');
     err.status = 404;
     throw err;
   }
+
   if (verifyTransactionToken(opts.transactionToken) === true) {
-    const err = new Error('Duplicate transaction detected, tray again in few minutes');
+    const err = new Error('Duplicate transaction detected, try again in few minutes');
     throw err;
   }
+
+  const txRef = generateTransactionRef();
+
   const body = {
     fromAccount: accountDetails.account_number,
     toAccount: opts.toCustomerAccount,
-    transactionReference: generateTransactionRef(),
+    transactionReference: txRef,
     amount: parseFloat(opts.amount),
     remarks: opts.narration || 'Wallet transfer'
   };
 
-  //console.log("Transfer body:", body);
-  const res = await safeCall(() => transactions.toWallet(body));
-  return res;
+  const providerRes = await safeCall(() => transactions.toWallet(body));
+
+  const providerStatus =
+    providerRes?.status ||
+    providerRes?.data?.status ||
+    providerRes?.data?.responseCode;
+
+  const providerCode = providerRes?.code;
+  const isSuccessful = providerRes?.success === true || providerCode === '00';
+
+  console.log("PROVIDER CODE:", providerCode, "SUCCESS:", providerRes?.success, "IS SUCCESSFUL:", isSuccessful);
+
+  if (!isSuccessful) return providerRes;
+
+// Only look up store if storeCode was provided
+  const shouldLookupStore = !!opts.storeCode;
+
+  await sequelize.transaction(async (t) => {
+    let store = null;
+
+  if (shouldLookupStore) {
+    store = await Store.findOne({
+      where: { store_code: opts.storeCode, status: 'active' },
+      transaction: t,
+    });
+  }
+  console.log("STORE CODE:", opts.storeCode);
+  console.log("STORE FOUND:", store);
+  const purchaseAmount = parseFloat(opts.amount);
+
+  // 1) Transaction is created ALWAYS (for successful provider transfer)
+  const txn = await Transaction.create(
+    {
+      transaction_id: txRef,
+      customer_id: opts.fromCustomerId,
+      store_id: store ? store.store_id : null,   // ✅ set if found, else null
+      transaction_type: 'debit',
+      transaction_amount: purchaseAmount,
+      initial_amount: purchaseAmount,
+      final_amount: purchaseAmount,
+      transaction_fee: 0.0,
+      receiver_bank: 'WALLET',
+      status: 'completed',
+    },
+    { transaction: t }
+  );
+
+  // 2) PointHistory ONLY if storeCode provided AND store exists
+  if (store) {
+    const rate = parseFloat(store.points_rate);
+    const pointsEarned = purchaseAmount * rate;
+
+    await PointHistory.create(
+      {
+        customer_id: opts.fromCustomerId,
+        store_id: store.store_id,            // ✅ will not be null here
+        transaction_id: txn.transaction_id,
+        purchase_amount: purchaseAmount,
+        point_rate_applied: rate,
+        points_earned: pointsEarned,
+      },
+      { transaction: t }
+    );
+  }
+});
+  return providerRes;
 }
 
 export async function getTransactionHistory(

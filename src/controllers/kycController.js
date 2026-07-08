@@ -14,10 +14,11 @@ import { sendMail } from '../utilities/nodeMailer.js';
 
 // Validation helpers
 const isValidPin = (pin) => /^\d{4}$/.test(pin);
+const isValidNIN = (nin) => /^\d{11}$/.test(nin);
 const isValidEmail = (email) => validator.isEmail(email);
 
 
-export const updateKYC = async (req, res, next) => {
+export const  updateKYC = async (req, res, next) => {
   try {
     const { pin, gender, dob, address, nin, email: emailInput, city } = req.body;
     const customer_id = req.user.customer_id;
