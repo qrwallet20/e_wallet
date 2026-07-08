@@ -9,6 +9,12 @@ if (!DATABASE_URL) {
 const sequelize = new Sequelize(DATABASE_URL, {
     dialect: 'postgres',
     logging: false,
+    dialectOptions: {
+        ssl: {
+            require: true,
+            rejectUnauthorized: false
+        }
+    }
 });
 
 // Function to sync database models
