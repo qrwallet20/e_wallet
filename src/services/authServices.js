@@ -2,6 +2,7 @@ import bcrypt from 'bcrypt';
 import User from '../models/user.js';
 import { v4 as uuid } from 'uuid';
 import { sequelize } from '../config/database.js';
+import EmailVerification from '../models/emailVerification.js';
 import { Op } from 'sequelize';
 import { safeCall } from '../utilities/apiWrapper.js';
 import { customers } from '../transactions/embedlyClients.js';
@@ -98,7 +99,19 @@ const country_id = COUNTRY_ID;
 
   // 4) Atomic create
   return await sequelize.transaction(async (t) => {
-    
+    const verified = await EmailVerification.findOne({
+  where: {
+    email,
+    purpose: 'signup',
+    active: false,        // consumed = marked inactive
+    consumed_at: { [Op.ne]: null },  // actually consumed
+    expires_at: { [Op.gt]: new Date() }  // within expiry window
+  }
+});
+
+if (!verified) {
+  throw new Error('Email verification required before registration');
+}
     // a) Create the local user
     const newUser = await User.create({
       customer_id,

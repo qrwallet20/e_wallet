@@ -69,8 +69,8 @@ export async function confirmEmailVerification({ email, code, purpose = 'signup'
     where: {
       email,
       purpose,
-      active: true,
-      consumed_at: null,
+      active: false, // only check active records
+      consumed_at: new Date(), // not consumed
       expires_at: { [Op.gt]: now },
     },
     order: [['createdAt', 'DESC']],
